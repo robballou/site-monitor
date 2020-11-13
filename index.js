@@ -9,13 +9,23 @@ const pages = [
     id: 'add-to-cart-button'
   },
   {
-    url: 'https://www.walmart.com/ip/Xbox-Series-X/443574645',
+    url: 'https://www.bestbuy.com/site/microsoft-xbox-series-x-1tb-console-black/6428324.p?skuId=6428324',
+    selector: '.add-to-cart-button',
+    hasNoClass: 'btn-disabled'
+  },
+  {
+    url: 'https://www.walmart.com/ip/XB1-Xbox-Series-X/443574645',
     selector: '.prod-product-cta-add-to-cart'
+  },
+  {
+    url: 'https://direct.playstation.com/en-us/consoles/console/playstation5-console.3005816',
+    selector: 'add-to-cart'
   }
 ]
 
 let canPoll = true
 let abort = null
+const browsers = new WeakSet()
 
 async function main () {
   d('main: start')
@@ -46,16 +56,24 @@ async function applyAssert (browserPromise, page) {
   const parsed = new URL(page.url)
   d(`applyAssert: ${parsed.host} start`)
   let passed = true
+  const browser = await browserPromise
   try {
-    const browser = await browserPromise
+    browser.assert.success()
     browser.assert.element(page.id ? `#${page.id}` : page.selector)
-    notifier.notify(`${parsed.host} passed!`)
+    if (page.hasNoClass) {
+      browser.assert.hasNoClass(page.selector, page.hasNoClass)
+    }
+    notifier.notify({ title: `${parsed.host} passed!`, open: page.url })
   } catch (err) {
     console.error(`Assertion for page failed: ${parsed.host}`)
     if (!err.code || err.code !== 'ERR_ASSERTION') {
       console.error(err)
+    } else {
+      d(err)
     }
     passed = false
+  } finally {
+    browsers.delete(browser)
   }
   d(`applyAssert: ${parsed.host} done`)
   return passed
@@ -93,6 +111,7 @@ function pollPage (url) {
   d(`pollPage: ${parsed.host} start`)
   return new Promise((resolve) => {
     const b = new Browser()
+    browsers.add(b)
     b.visit(url, {}, (...args) => {
       d(`pollPage: ${parsed.host} done`, args)
       resolve(b)
